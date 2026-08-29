@@ -4,6 +4,12 @@ struct HistoryView: View {
     @State private var items: [HistoryItem] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    // Separate from `errorMessage` -- that one replaces the whole list with
+    // a full error state (right for "couldn't load history at all"), this
+    // one is a transient alert on top of an otherwise-fine list (right for
+    // "reconsidering this one item failed", the rest of History is still
+    // good).
+    @State private var reconsiderError: String?
 
     let api = APIClient()
 
@@ -12,6 +18,11 @@ struct HistoryView: View {
             content
             .navigationTitle("History")
             .task { await load() }
+            .alert("Couldn't reconsider", isPresented: .constant(reconsiderError != nil), presenting: reconsiderError) { _ in
+                Button("OK") { reconsiderError = nil }
+            } message: { message in
+                Text(message)
+            }
         }
     }
 
@@ -52,8 +63,26 @@ struct HistoryView: View {
     }
 
     private var historyList: some View {
-        List(items) { item in
-            HistoryRow(item: item)
+        List {
+            ForEach(items) { item in
+                HistoryRow(item: item)
+                    // "Change my mind" (2026-08-30, Jan's explicit ask) --
+                    // only a `declined` entry can go back into the live
+                    // candidate queue; the server enforces this too (see
+                    // APIClient.reconsiderHistoryEntry's doc comment), this
+                    // is just so the affordance doesn't even appear on rows
+                    // it would only 400 on.
+                    .swipeActions(edge: .trailing) {
+                        if item.status == .declined {
+                            Button {
+                                Task { await reconsider(item) }
+                            } label: {
+                                Label("Reconsider", systemImage: "arrow.uturn.backward")
+                            }
+                            .tint(Color.accentColor)
+                        }
+                    }
+            }
         }
         .listStyle(.plain)
         .refreshable { await load() }
@@ -69,6 +98,19 @@ struct HistoryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Removes the row locally only after the server confirms -- it's back
+    /// in the live candidate queue at that point, so it genuinely no longer
+    /// belongs in History (rather than removing optimistically and risking
+    /// a row that silently vanishes if the call actually failed).
+    func reconsider(_ item: HistoryItem) async {
+        do {
+            try await api.reconsiderHistoryEntry(id: item.id)
+            items.removeAll { $0.id == item.id }
+        } catch {
+            reconsiderError = error.localizedDescription
+        }
     }
 }
 

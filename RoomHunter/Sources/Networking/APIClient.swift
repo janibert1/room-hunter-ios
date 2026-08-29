@@ -120,4 +120,14 @@ struct APIClient {
         do { return try JSONDecoder().decode([HistoryItem].self, from: data) }
         catch { throw APIError.decoding(error) }
     }
+
+    /// "Change my mind" on a declined listing (2026-08-30) -- pulls it back
+    /// into the live candidate queue for a fresh yes/no + draft review, same
+    /// as a listing just found. Server-side rejects anything that isn't
+    /// currently `declined` (see api/server.py's own doc comment on this
+    /// endpoint for why `ineligible`/`sent` deliberately have no equivalent
+    /// here), so HistoryView only offers this action on declined rows.
+    func reconsiderHistoryEntry(id: String) async throws {
+        _ = try await request("/history/\(id)/reconsider", method: "POST")
+    }
 }

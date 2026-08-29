@@ -12,7 +12,7 @@ targets:
   RoomHunter:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources: [Sources, Assets]
     resources: [Resources]
     info:
       path: Resources/Info.plist

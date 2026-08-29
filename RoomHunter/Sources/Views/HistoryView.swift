@@ -13,14 +13,22 @@ struct HistoryView: View {
                 if isLoading && items.isEmpty {
                     ProgressView("Loading…")
                 } else if let errorMessage {
-                    VStack(spacing: 12) {
-                        Text(errorMessage).foregroundStyle(.secondary)
+                    VStack(spacing: 14) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.accent)
+                        Text(errorMessage).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         Button("Retry") { Task { await load() } }
+                            .buttonStyle(.borderedProminent)
                     }
+                    .padding()
                 } else if items.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "clock").font(.largeTitle).foregroundStyle(.secondary)
-                        Text("Nothing sent yet").foregroundStyle(.secondary)
+                    VStack(spacing: 10) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.accent)
+                        Text("Nothing sent yet").font(.headline).foregroundStyle(.secondary)
+                        Text("Rooms you respond to show up here").font(.subheadline).foregroundStyle(.tertiary)
                     }
                 } else {
                     List(items) { item in
@@ -53,9 +61,9 @@ struct HistoryRow: View {
 
     var statusColor: Color {
         switch item.status {
-        case .replied: return .green
-        case .sent: return .blue
-        case .noReplyYet: return .gray
+        case .replied: return Color(red: 0.29, green: 0.60, blue: 0.36)
+        case .sent: return .accentColor
+        case .noReplyYet: return .secondary
         }
     }
 

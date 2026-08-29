@@ -15,16 +15,22 @@ struct CandidateQueueView: View {
                 if isLoading && candidates.isEmpty {
                     ProgressView("Loading…")
                 } else if let errorMessage {
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.exclamationmark").font(.largeTitle).foregroundStyle(.secondary)
+                    VStack(spacing: 14) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.accent)
                         Text(errorMessage).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         Button("Retry") { Task { await load() } }
+                            .buttonStyle(.borderedProminent)
                     }
                     .padding()
                 } else if candidates.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.secondary)
-                        Text("Nothing waiting on you").foregroundStyle(.secondary)
+                    VStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.accent)
+                        Text("Nothing waiting on you").font(.headline).foregroundStyle(.secondary)
+                        Text("New rooms will show up here").font(.subheadline).foregroundStyle(.tertiary)
                     }
                 } else {
                     List(candidates) { candidate in
@@ -86,11 +92,14 @@ struct CandidateRow: View {
                 if let image = phase.image {
                     image.resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    Rectangle().fill(.quaternary)
+                    ZStack {
+                        Rectangle().fill(.quaternary)
+                        Image(systemName: "house.fill").foregroundStyle(.tertiary)
+                    }
                 }
             }
             .frame(width: 64, height: 64)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.title).font(.headline).lineLimit(2)
@@ -115,16 +124,16 @@ struct ScoreBadge: View {
     let score: Int
     var color: Color {
         switch score {
-        case 80...: return .green
-        case 60..<80: return .yellow
-        default: return .gray
+        case 80...: return Color(red: 0.29, green: 0.60, blue: 0.36) // considered green, not system default
+        case 60..<80: return .accentColor
+        default: return .secondary
         }
     }
     var body: some View {
         Text("\(score)")
-            .font(.headline)
+            .font(.headline.monospacedDigit())
             .foregroundStyle(.white)
-            .frame(width: 36, height: 36)
+            .frame(width: 38, height: 38)
             .background(color, in: Circle())
     }
 }

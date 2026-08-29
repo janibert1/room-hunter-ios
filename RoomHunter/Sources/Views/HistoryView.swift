@@ -80,6 +80,11 @@ struct HistoryRow: View {
         case .replied: return Color(red: 0.29, green: 0.60, blue: 0.36)
         case .sent: return .accentColor
         case .noReplyYet: return .secondary
+        // Deliberately distinct from .secondary/.noReplyYet -- these two
+        // are NOT "waiting to hear back", so they shouldn't read the same
+        // way at a glance.
+        case .declined: return Color(red: 0.72, green: 0.30, blue: 0.30)
+        case .ineligible: return Color(red: 0.55, green: 0.45, blue: 0.68)
         }
     }
 

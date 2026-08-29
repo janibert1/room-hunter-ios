@@ -57,12 +57,23 @@ enum HistoryStatus: String, Codable {
     case sent
     case replied
     case noReplyYet = "no_reply_yet"
+    // Added 2026-08-29: Jan wants a real record for the two other things
+    // that can happen to a listing besides "sent" -- he declined it
+    // himself (Kamernet/Laga "No"), or Room.nl's is_eligible() skipped it
+    // automatically (a demolition/renovation-permit-restricted listing).
+    // Neither implies a message ever went out, so neither reuses sent/
+    // replied/noReplyYet -- those all read as "something was sent, we're
+    // waiting" which would be misleading here.
+    case declined
+    case ineligible
 
     var label: String {
         switch self {
         case .sent: return "Sent"
         case .replied: return "Replied"
         case .noReplyYet: return "No reply yet"
+        case .declined: return "Declined"
+        case .ineligible: return "Skipped — not eligible"
         }
     }
 }

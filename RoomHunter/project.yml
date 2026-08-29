@@ -18,6 +18,7 @@ targets:
       path: Resources/Info.plist
       properties:
         CFBundleDisplayName: Room Hunter
+        CFBundleIconName: AppIcon
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

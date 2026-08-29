@@ -47,8 +47,25 @@ struct APIClient {
         self.settings = settings
     }
 
+    /// `URL(string:)` fails outright (returns nil) on a trailing space or
+    /// newline in the host portion -- confirmed live 2026-08-29: a plain
+    /// TextField-entered base URL picked up a trailing space (iOS keyboards
+    /// do this on dismiss/autocomplete-bar interaction even with
+    /// autocorrectionDisabled(), which only suppresses autocorrect
+    /// substitution, not the QuickType bar's own space-insertion behavior)
+    /// and silently broke every request with "Bad server URL" despite the
+    /// URL looking completely normal in Settings. Also strips a trailing
+    /// slash so "https://host/" and "https://host" both concatenate with
+    /// a leading-slash path ("/candidates") the same correct way, instead
+    /// of one of them producing a double slash.
+    private var normalizedBaseURL: String {
+        var s = settings.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while s.hasSuffix("/") { s.removeLast() }
+        return s
+    }
+
     private func request(_ path: String, method: String = "GET", body: Data? = nil) async throws -> Data {
-        guard let url = URL(string: settings.baseURL + path) else { throw APIError.badURL }
+        guard let url = URL(string: normalizedBaseURL + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = method
         if !settings.apiKey.isEmpty {

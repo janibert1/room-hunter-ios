@@ -37,7 +37,7 @@ struct CandidateDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(candidate.title).font(.title2.bold())
                         HStack {
-                            if let price = candidate.price { Text(price).foregroundStyle(.secondary) }
+                            if let price = candidate.formattedPrice { Text(price).foregroundStyle(.secondary) }
                             if let location = candidate.location { Text("· \(location)").foregroundStyle(.secondary) }
                         }
                         Text(candidate.source.uppercased()).font(.caption).foregroundStyle(.tertiary)

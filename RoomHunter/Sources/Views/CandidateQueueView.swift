@@ -11,38 +11,7 @@ struct CandidateQueueView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading && candidates.isEmpty {
-                    ProgressView("Loading…")
-                } else if let errorMessage {
-                    VStack(spacing: 14) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.accent)
-                        Text(errorMessage).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                        Button("Retry") { Task { await load() } }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else if candidates.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 44))
-                            .foregroundStyle(.accent)
-                        Text("Nothing waiting on you").font(.headline).foregroundStyle(.secondary)
-                        Text("New rooms will show up here").font(.subheadline).foregroundStyle(.tertiary)
-                    }
-                } else {
-                    List(candidates) { candidate in
-                        Button { selected = candidate } label: {
-                            CandidateRow(candidate: candidate)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .listStyle(.plain)
-                    .refreshable { await load() }
-                }
-            }
+            content
             .navigationTitle("Queue")
             .task { await load() }
             .onChange(of: nav.pendingCandidateId) { _, newId in
@@ -55,6 +24,58 @@ struct CandidateQueueView: View {
                 })
             }
         }
+    }
+
+    // Extracted out of `body` -- Swift's type-checker choked on the combined
+    // conditional+VStack+extra-Text nesting inline (a real, confusing
+    // compiler error: "generic parameter could not be inferred" pointing at
+    // an unrelated TableColumn overload). Splitting each branch into its
+    // own @ViewBuilder property is the standard fix for this class of
+    // SwiftUI type-inference complexity issue.
+    @ViewBuilder
+    private var content: some View {
+        if isLoading && candidates.isEmpty {
+            ProgressView("Loading…")
+        } else if let errorMessage {
+            errorState(errorMessage)
+        } else if candidates.isEmpty {
+            emptyState
+        } else {
+            candidateList
+        }
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 40))
+                .foregroundStyle(.accent)
+            Text(message).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Retry") { Task { await load() } }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.accent)
+            Text("Nothing waiting on you").font(.headline).foregroundStyle(.secondary)
+            Text("New rooms will show up here").font(.subheadline).foregroundStyle(.tertiary)
+        }
+    }
+
+    private var candidateList: some View {
+        List(candidates) { candidate in
+            Button { selected = candidate } label: {
+                CandidateRow(candidate: candidate)
+            }
+            .buttonStyle(.plain)
+        }
+        .listStyle(.plain)
+        .refreshable { await load() }
     }
 
     func load() async {

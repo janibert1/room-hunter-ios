@@ -9,38 +9,54 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading && items.isEmpty {
-                    ProgressView("Loading…")
-                } else if let errorMessage {
-                    VStack(spacing: 14) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.accent)
-                        Text(errorMessage).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                        Button("Retry") { Task { await load() } }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else if items.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 44))
-                            .foregroundStyle(.accent)
-                        Text("Nothing sent yet").font(.headline).foregroundStyle(.secondary)
-                        Text("Rooms you respond to show up here").font(.subheadline).foregroundStyle(.tertiary)
-                    }
-                } else {
-                    List(items) { item in
-                        HistoryRow(item: item)
-                    }
-                    .listStyle(.plain)
-                    .refreshable { await load() }
-                }
-            }
+            content
             .navigationTitle("History")
             .task { await load() }
         }
+    }
+
+    // Same fix as CandidateQueueView -- see its comment on `content`.
+    @ViewBuilder
+    private var content: some View {
+        if isLoading && items.isEmpty {
+            ProgressView("Loading…")
+        } else if let errorMessage {
+            errorState(errorMessage)
+        } else if items.isEmpty {
+            emptyState
+        } else {
+            historyList
+        }
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 40))
+                .foregroundStyle(.accent)
+            Text(message).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Retry") { Task { await load() } }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 44))
+                .foregroundStyle(.accent)
+            Text("Nothing sent yet").font(.headline).foregroundStyle(.secondary)
+            Text("Rooms you respond to show up here").font(.subheadline).foregroundStyle(.tertiary)
+        }
+    }
+
+    private var historyList: some View {
+        List(items) { item in
+            HistoryRow(item: item)
+        }
+        .listStyle(.plain)
+        .refreshable { await load() }
     }
 
     func load() async {

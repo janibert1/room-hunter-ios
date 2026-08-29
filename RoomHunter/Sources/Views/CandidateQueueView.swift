@@ -49,7 +49,7 @@ struct CandidateQueueView: View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 40))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
             Text(message).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Button("Retry") { Task { await load() } }
                 .buttonStyle(.borderedProminent)
@@ -61,7 +61,7 @@ struct CandidateQueueView: View {
         VStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
             Text("Nothing waiting on you").font(.headline).foregroundStyle(.secondary)
             Text("New rooms will show up here").font(.subheadline).foregroundStyle(.tertiary)
         }

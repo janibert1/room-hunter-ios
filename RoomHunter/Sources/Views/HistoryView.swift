@@ -33,7 +33,7 @@ struct HistoryView: View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 40))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
             Text(message).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Button("Retry") { Task { await load() } }
                 .buttonStyle(.borderedProminent)
@@ -45,7 +45,7 @@ struct HistoryView: View {
         VStack(spacing: 10) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 44))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
             Text("Nothing sent yet").font(.headline).foregroundStyle(.secondary)
             Text("Rooms you respond to show up here").font(.subheadline).foregroundStyle(.tertiary)
         }

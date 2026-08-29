@@ -125,7 +125,7 @@ struct CandidateRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.title).font(.headline).lineLimit(2)
                 HStack(spacing: 6) {
-                    if let price = candidate.price {
+                    if let price = candidate.formattedPrice {
                         Text(price).font(.subheadline).foregroundStyle(.secondary)
                     }
                     if let location = candidate.location {

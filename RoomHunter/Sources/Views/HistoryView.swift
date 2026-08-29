@@ -96,7 +96,7 @@ struct HistoryRow: View {
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(statusColor.opacity(0.15), in: Capsule())
                     .foregroundStyle(statusColor)
-                if let change = item.lastStatusChange {
+                if let change = item.lastStatusChangeRelative {
                     Text(change).font(.caption2).foregroundStyle(.tertiary)
                 }
             }

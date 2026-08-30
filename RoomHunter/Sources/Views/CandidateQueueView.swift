@@ -132,7 +132,12 @@ struct CandidateRow: View {
                         Text("· \(location)").font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
-                Text(candidate.source).font(.caption2).textCase(.uppercase).foregroundStyle(.tertiary)
+                HStack(spacing: 4) {
+                    Text(candidate.source).font(.caption2).textCase(.uppercase).foregroundStyle(.tertiary)
+                    if let postedAtRelative = candidate.postedAtRelative {
+                        Text("· Posted \(postedAtRelative)").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
             }
             Spacer()
             ScoreBadge(score: candidate.score)

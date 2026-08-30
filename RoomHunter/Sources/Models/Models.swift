@@ -21,6 +21,14 @@ struct Candidate: Identifiable, Codable {
     // Same real bug as price -- store.py/main.py write this via Python's
     // time.time() (a Unix timestamp float), not a formatted string.
     let scoredAt: Double?
+    // 2026-08-30, Jan asked for "how long since the room was placed on
+    // Kamernet" in the app. Raw ISO string from the source (Kamernet's
+    // publishDate/createDate, Laga's WhatsApp message timestamp) -- NOT
+    // pre-formatted server-side, same reasoning as HistoryItem.sentAt/
+    // lastStatusChange: compute the relative label client-side so it
+    // stays correct without a re-fetch. nil for a source with no real
+    // posted date (Room.nl -- doesn't reach /candidates at all anyway).
+    let postedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id, source, title, price, location, photos
@@ -28,6 +36,7 @@ struct Candidate: Identifiable, Codable {
         case score
         case scoreBreakdown = "score_breakdown"
         case scoredAt = "scored_at"
+        case postedAt = "posted_at"
     }
 
     /// "€695/month", or nil if price is unknown -- callers should treat
@@ -35,6 +44,48 @@ struct Candidate: Identifiable, Codable {
     /// a price line), same as before this was still a String.
     var formattedPrice: String? {
         price.map { "€\($0)/month" }
+    }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return f
+    }()
+
+    // Two real formats seen live in production data, neither of which
+    // ISO8601DateFormatter's default options parse on their own: Laga's
+    // "2026-08-16T13:51:46.000Z" (fractional seconds + Z) and Kamernet's
+    // "2026-08-29T12:17:34.017" (fractional seconds, no timezone
+    // designator at all -- Kamernet's own API just omits it). Try the
+    // strict internet-date-time+fractional-seconds parser first (handles
+    // Laga), then fall back to a fixed-format DateFormatter with no
+    // timezone assumption beyond "treat it as UTC", which is fine here --
+    // this only ever feeds a coarse "N days ago" label, a few hours of
+    // slop from an unstated timezone doesn't matter.
+    private static let strictISOFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let noTimezoneFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        return f
+    }()
+
+    static func parsePostedAt(_ raw: String) -> Date? {
+        strictISOFormatter.date(from: raw) ?? noTimezoneFormatter.date(from: raw)
+    }
+
+    /// "3 days ago", or nil if postedAt is missing/unparseable -- callers
+    /// should just omit the line in that case, same as every other
+    /// optional display field on this model.
+    var postedAtRelative: String? {
+        guard let postedAt, let date = Self.parsePostedAt(postedAt) else { return nil }
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

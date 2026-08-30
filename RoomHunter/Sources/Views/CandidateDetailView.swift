@@ -40,7 +40,12 @@ struct CandidateDetailView: View {
                             if let price = candidate.formattedPrice { Text(price).foregroundStyle(.secondary) }
                             if let location = candidate.location { Text("· \(location)").foregroundStyle(.secondary) }
                         }
-                        Text(candidate.source.uppercased()).font(.caption).foregroundStyle(.tertiary)
+                        HStack(spacing: 4) {
+                            Text(candidate.source.uppercased()).font(.caption).foregroundStyle(.tertiary)
+                            if let postedAtRelative = candidate.postedAtRelative {
+                                Text("· Posted \(postedAtRelative)").font(.caption).foregroundStyle(.tertiary)
+                            }
+                        }
                     }
 
                     if let breakdown = candidate.scoreBreakdown, !breakdown.isEmpty {

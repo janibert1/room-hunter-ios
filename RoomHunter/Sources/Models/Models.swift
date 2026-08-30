@@ -89,6 +89,18 @@ struct Candidate: Identifiable, Codable {
     }
 }
 
+/// 2026-08-30, Jan's explicit ask: "preview the photo that i send and
+/// allow me to change them" -- one of Jan's own profile photos (always
+/// attached to a real send, see profile_photos.py server-side), shown in
+/// DraftReviewView with a toggle so he can pick which ones actually go
+/// out before sending, not just discover after the fact that it always
+/// sent all of them.
+struct ProfilePhoto: Identifiable, Codable {
+    let id: Int
+    let url: String
+    let selected: Bool
+}
+
 struct HighlightSpan: Codable {
     let start: Int
     let end: Int

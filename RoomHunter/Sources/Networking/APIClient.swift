@@ -130,4 +130,27 @@ struct APIClient {
     func reconsiderHistoryEntry(id: String) async throws {
         _ = try await request("/history/\(id)/reconsider", method: "POST")
     }
+
+    /// The profile photos always attached to a real send (see
+    /// profile_photos.py server-side) -- 2026-08-30, so Jan can preview
+    /// and choose which ones actually go out.
+    func fetchProfilePhotos() async throws -> [ProfilePhoto] {
+        let data = try await request("/profile-photos")
+        do { return try JSONDecoder().decode([ProfilePhoto].self, from: data) }
+        catch { throw APIError.decoding(error) }
+    }
+
+    /// Saves which photos are selected -- global, not per-candidate (same
+    /// scope as the server-side setting: Jan's own generic photos of
+    /// himself, reused across every listing he messages). Returns the
+    /// server's corrected list (any id that isn't a real available photo
+    /// is silently dropped server-side) so the caller can reconcile its
+    /// local state against what actually got saved.
+    @discardableResult
+    func setProfilePhotoSelection(ids: [Int]) async throws -> [Int] {
+        let body = try JSONEncoder().encode(["ids": ids])
+        let data = try await request("/profile-photos/selected", method: "PUT", body: body)
+        do { return try JSONDecoder().decode([String: [Int]].self, from: data)["selected_ids"] ?? [] }
+        catch { throw APIError.decoding(error) }
+    }
 }

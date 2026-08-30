@@ -20,6 +20,13 @@ struct DraftReviewView: View {
     @State private var errorMessage: String?
     @State private var showSendConfirm = false
 
+    // 2026-08-30, Jan's explicit ask: preview + change which of his own
+    // profile photos get sent alongside the message. Loaded separately
+    // from the draft itself (own endpoint, own failure mode) -- a photo
+    // load failure shouldn't block reviewing/sending the text.
+    @State private var photos: [ProfilePhoto] = []
+    @State private var photosErrorMessage: String?
+
     var body: some View {
         NavigationStack {
             Group {
@@ -43,6 +50,8 @@ struct DraftReviewView: View {
                         if let errorMessage {
                             Text(errorMessage).foregroundStyle(.red).font(.callout).padding(.horizontal)
                         }
+
+                        photoPicker
                     }
                 }
             }
@@ -78,7 +87,99 @@ struct DraftReviewView: View {
                 Text("This actually sends the message above to the landlord/poster. Not a preview.")
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await loadPhotos()
+        }
+    }
+
+    /// Sent alongside every real message (see profile_photos.py
+    /// server-side) -- a horizontal strip of Jan's own profile photos,
+    /// each with a checkmark when selected. Tapping toggles it and saves
+    /// immediately (global setting, not scoped to this one candidate, so
+    /// there's no separate "save" step to forget).
+    @ViewBuilder
+    private var photoPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Photos sent with this message").font(.caption).foregroundStyle(.secondary)
+            if let photosErrorMessage {
+                Text(photosErrorMessage).font(.caption).foregroundStyle(.red)
+            } else if photos.isEmpty {
+                Text("No profile photos found").font(.caption).foregroundStyle(.tertiary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(photos) { photo in
+                            Button {
+                                Task { await togglePhoto(photo) }
+                            } label: {
+                                photoThumbnail(photo)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                Text(selectedCountLabel).font(.caption2).foregroundStyle(.tertiary).padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private var selectedCountLabel: String {
+        let n = photos.filter(\.selected).count
+        if n == 0 { return "None selected — message will send with no photos" }
+        return "\(n) of \(photos.count) selected"
+    }
+
+    private func photoThumbnail(_ photo: ProfilePhoto) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            AsyncImage(url: URL(string: photo.url)) { phase in
+                if let image = phase.image {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle().fill(.quaternary)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .opacity(photo.selected ? 1.0 : 0.35)
+
+            Image(systemName: photo.selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 18))
+                .foregroundStyle(photo.selected ? Color.accentColor : .secondary)
+                .background(Circle().fill(.white))
+                .padding(4)
+        }
+    }
+
+    func loadPhotos() async {
+        do {
+            photos = try await api.fetchProfilePhotos()
+            photosErrorMessage = nil
+        } catch {
+            photosErrorMessage = "Couldn't load photos: \(error.localizedDescription)"
+        }
+    }
+
+    func togglePhoto(_ photo: ProfilePhoto) async {
+        guard let idx = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+        // Optimistic local flip so the tap feels instant, reconciled
+        // against the server's actual saved list right after -- same
+        // "server response is the real truth" pattern the rest of the app
+        // uses (e.g. reconsiderHistoryEntry), not a blind local-only toggle.
+        let wasSelected = photos[idx].selected
+        photos[idx] = ProfilePhoto(id: photo.id, url: photo.url, selected: !wasSelected)
+        let requestedIds = photos.filter(\.selected).map(\.id)
+        do {
+            let savedIds = Set(try await api.setProfilePhotoSelection(ids: requestedIds))
+            photos = photos.map { ProfilePhoto(id: $0.id, url: $0.url, selected: savedIds.contains($0.id)) }
+            photosErrorMessage = nil
+        } catch {
+            photos[idx] = ProfilePhoto(id: photo.id, url: photo.url, selected: wasSelected)  // revert on failure
+            photosErrorMessage = "Couldn't save photo selection: \(error.localizedDescription)"
+        }
     }
 
     func load() async {

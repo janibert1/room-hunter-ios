@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Loaded after "Yes". Shows the editable draft (Gemini's <=3 personalized
 /// sentences highlighted, per Jan's spec) and requires an explicit confirm
@@ -26,6 +27,14 @@ struct DraftReviewView: View {
     // load failure shouldn't block reviewing/sending the text.
     @State private var photos: [ProfilePhoto] = []
     @State private var photosErrorMessage: String?
+
+    // 2026-08-30, second ask same day: "i also want to be able to add
+    // more photos of my own." pickerItem drives upload; longPressTarget
+    // drives delete (a destructive action, so it goes through a real
+    // confirmation dialog rather than firing on the long-press itself).
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var isUploadingPhoto = false
+    @State private var deleteTarget: ProfilePhoto?
 
     var body: some View {
         NavigationStack {
@@ -104,30 +113,65 @@ struct DraftReviewView: View {
             Text("Photos sent with this message").font(.caption).foregroundStyle(.secondary)
             if let photosErrorMessage {
                 Text(photosErrorMessage).font(.caption).foregroundStyle(.red)
-            } else if photos.isEmpty {
-                Text("No profile photos found").font(.caption).foregroundStyle(.tertiary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(photos) { photo in
-                            Button {
-                                Task { await togglePhoto(photo) }
-                            } label: {
-                                photoThumbnail(photo)
-                            }
-                            .buttonStyle(.plain)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(photos) { photo in
+                        Button {
+                            Task { await togglePhoto(photo) }
+                        } label: {
+                            photoThumbnail(photo)
+                        }
+                        .buttonStyle(.plain)
+                        // Long-press to delete -- a destructive action, so
+                        // it opens a real confirmation rather than firing
+                        // on the press itself (same standard as Send).
+                        .onLongPressGesture {
+                            deleteTarget = photo
                         }
                     }
-                    .padding(.horizontal)
+                    addPhotoTile
                 }
-                Text(selectedCountLabel).font(.caption2).foregroundStyle(.tertiary).padding(.horizontal)
+                .padding(.horizontal)
             }
+            Text(selectedCountLabel).font(.caption2).foregroundStyle(.tertiary).padding(.horizontal)
         }
         .padding(.vertical, 10)
         .background(.bar)
+        .confirmationDialog(
+            "Delete this photo?",
+            isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let target = deleteTarget { Task { await deletePhoto(target) } }
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: {
+            Text("This removes it from your profile photos entirely, not just from this message.")
+        }
+    }
+
+    private var addPhotoTile: some View {
+        PhotosPicker(selection: $pickerItem, matching: .images) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10).fill(.quaternary)
+                if isUploadingPhoto {
+                    ProgressView()
+                } else {
+                    Image(systemName: "plus").font(.system(size: 22)).foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 72, height: 72)
+        }
+        .disabled(isUploadingPhoto)
+        .onChange(of: pickerItem) { _, newItem in
+            Task { await uploadPicked(newItem) }
+        }
     }
 
     private var selectedCountLabel: String {
+        if photos.isEmpty { return "No profile photos yet — tap + to add one" }
         let n = photos.filter(\.selected).count
         if n == 0 { return "None selected — message will send with no photos" }
         return "\(n) of \(photos.count) selected"
@@ -180,6 +224,43 @@ struct DraftReviewView: View {
             photos[idx] = ProfilePhoto(id: photo.id, url: photo.url, selected: wasSelected)  // revert on failure
             photosErrorMessage = "Couldn't save photo selection: \(error.localizedDescription)"
         }
+    }
+
+    /// Re-encodes whatever the picker hands back to JPEG rather than
+    /// trusting/detecting the source format -- sidesteps content-type
+    /// sniffing entirely (a HEIC photo straight off the camera roll would
+    /// otherwise need real format detection) and keeps upload size sane.
+    func uploadPicked(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        isUploadingPhoto = true
+        photosErrorMessage = nil
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data),
+                  let jpegData = uiImage.jpegData(compressionQuality: 0.85) else {
+                photosErrorMessage = "Couldn't read that photo."
+                isUploadingPhoto = false
+                pickerItem = nil
+                return
+            }
+            let newPhoto = try await api.uploadProfilePhoto(imageData: jpegData, contentType: "image/jpeg")
+            photos.append(newPhoto)
+        } catch {
+            photosErrorMessage = "Couldn't upload photo: \(error.localizedDescription)"
+        }
+        isUploadingPhoto = false
+        pickerItem = nil
+    }
+
+    func deletePhoto(_ photo: ProfilePhoto) async {
+        do {
+            try await api.deleteProfilePhoto(id: photo.id)
+            photos.removeAll { $0.id == photo.id }
+            photosErrorMessage = nil
+        } catch {
+            photosErrorMessage = "Couldn't delete photo: \(error.localizedDescription)"
+        }
+        deleteTarget = nil
     }
 
     func load() async {

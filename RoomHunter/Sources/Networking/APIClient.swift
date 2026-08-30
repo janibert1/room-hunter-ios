@@ -153,4 +153,41 @@ struct APIClient {
         do { return try JSONDecoder().decode([String: [Int]].self, from: data)["selected_ids"] ?? [] }
         catch { throw APIError.decoding(error) }
     }
+
+    /// Uploads a new profile photo (2026-08-30, Jan: "i also want to be
+    /// able to add more photos of my own"). Multipart/form-data, since
+    /// this is raw bytes from Jan's own photo library, not a URL
+    /// reference like every other endpoint in this file -- built by hand
+    /// here rather than through the shared `request()` helper, which only
+    /// knows how to send a plain JSON body.
+    func uploadProfilePhoto(imageData: Data, contentType: String) async throws -> ProfilePhoto {
+        guard let url = URL(string: normalizedBaseURL + "/profile-photos") else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        if !settings.apiKey.isEmpty {
+            req.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.http(0, "no HTTP response") }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        do { return try JSONDecoder().decode(ProfilePhoto.self, from: data) }
+        catch { throw APIError.decoding(error) }
+    }
+
+    func deleteProfilePhoto(id: Int) async throws {
+        _ = try await request("/profile-photos/\(id)", method: "DELETE")
+    }
 }
